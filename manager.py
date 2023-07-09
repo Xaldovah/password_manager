@@ -1,7 +1,4 @@
 #!/usr/bin/python3
-"""
-Password Manager Program
-"""
 
 import os.path
 from cryptography.fernet import Fernet, InvalidToken
@@ -12,7 +9,6 @@ import base64
 
 
 KEYS_DIRECTORY = "keys"
-SALT_FILE = "salt.txt"
 PASSWORDS_FILE = "passwords.txt"
 ITERATIONS = 100_000
 KEY_LENGTH = 32
@@ -50,42 +46,20 @@ def load_key(master_password, salt):
     return base64.urlsafe_b64encode(key)
 
 
-def initialize():
-    """
-    Initialize the password manager by creating the necessary directories and loading master passwords.
-    """
-    if not os.path.exists(KEYS_DIRECTORY):
-        os.makedirs(KEYS_DIRECTORY)
-
-    global master_passwords
-    master_passwords = read_master_passwords()
-
-
-def read_master_passwords():
-    """
-    Read the master passwords from the password file.
-    """
-    password_dict = {}
-    if os.path.exists(PASSWORDS_FILE):
-        with open(PASSWORDS_FILE, "r") as f:
-            for line in f:
-                values = line.strip().split("|")
-                if len(values) == 2:
-                    user, master_pwd = values
-                    password_dict[user] = master_pwd
-    return password_dict
-
-
 def write_key(user, master_password, key, salt):
     """
     Write the encryption key to a file and update the master password dictionary.
     """
     key_file = os.path.join(KEYS_DIRECTORY, f"{user}.key")
+    os.makedirs(os.path.dirname(key_file), exist_ok=True)
     with open(key_file, "wb") as f:
         f.write(key)
 
     global master_passwords
-    master_passwords[user] = master_password
+    if user in master_passwords:
+        master_passwords[user].append(master_password)
+    else:
+        master_passwords[user] = [master_password]
 
     with open(PASSWORDS_FILE, "a") as f:
         f.write(f"{user}|{master_password}|{base64.urlsafe_b64encode(salt).decode()}\n")
@@ -123,7 +97,7 @@ def view():
 
     master_pwd = input("Enter the master password to view passwords: ")
 
-    if master_passwords[user] != master_pwd:
+    if master_pwd not in master_passwords[user]:
         print("Invalid master password. Access denied.")
         return
 
@@ -137,8 +111,7 @@ def view():
 
     with open(PASSWORDS_FILE, "r") as f:
         for line in f.readlines():
-            data = line.rstrip()
-            values = data.split("|")
+            values = line.strip().split("|")
             if len(values) == 4 and values[0] == user:
                 cipher_suite = Fernet(key)
                 try:
@@ -149,10 +122,18 @@ def view():
                     return
 
 
-initialize()
+if os.path.exists(PASSWORDS_FILE):
+    with open(PASSWORDS_FILE, "r") as f:
+        for line in f:
+            user, master_pwd, _ = line.strip().split("|")
+            if user in master_passwords:
+                master_passwords[user].append(master_pwd)
+            else:
+                master_passwords[user] = [master_pwd]
+
 
 while True:
-    mode = input("Press Add or View (to add or view passwords), press q to quit ").lower()
+    mode = input("Press Add or View (to add or view passwords), press q to quit: ").lower()
     if mode == "q":
         break
     elif mode == "view":
