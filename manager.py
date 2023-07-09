@@ -4,48 +4,91 @@ Password Manager Program
 """
 
 import os.path
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives.hashes import SHA256
+from cryptography.hazmat.backends import default_backend
+import base64
 
 
-KEY_FILE = "key.key"
+KEYS_DIRECTORY = "keys"
+SALT_FILE = "salt.txt"
 PASSWORDS_FILE = "passwords.txt"
+ITERATIONS = 100_000
+KEY_LENGTH = 32
+
+master_passwords = {}
 
 
-def write_key():
+def generate_key(master_password, salt):
     """
-    Generate a new encryption key and write it to a file.
+    Generate a unique encryption key for a given master password and salt.
     """
-    key = Fernet.generate_key()
-    with open(KEY_FILE, "wb") as key_file:
-        key_file.write(key)
+    kdf = PBKDF2HMAC(
+        algorithm=SHA256(),
+        salt=salt,
+        length=KEY_LENGTH,
+        iterations=ITERATIONS,
+        backend=default_backend()
+    )
+    key = kdf.derive(master_password.encode())
+    return base64.urlsafe_b64encode(key)
 
 
-def load_key():
+def load_key(master_password, salt):
     """
-    Load the encryption key from a file, or generate a new key if the file doesn't exist.
+    Load the encryption key for a given master password and salt.
     """
-    if not os.path.exists(KEY_FILE):
-        write_key()
+    kdf = PBKDF2HMAC(
+        algorithm=SHA256(),
+        salt=salt,
+        length=KEY_LENGTH,
+        iterations=ITERATIONS,
+        backend=default_backend()
+    )
+    key = kdf.derive(master_password.encode())
+    return base64.urlsafe_b64encode(key)
 
-    with open(KEY_FILE, "rb") as key_file:
-        key = key_file.read()
-    return key
+
+def initialize():
+    """
+    Initialize the password manager by creating the necessary directories and loading master passwords.
+    """
+    if not os.path.exists(KEYS_DIRECTORY):
+        os.makedirs(KEYS_DIRECTORY)
+
+    global master_passwords
+    master_passwords = read_master_passwords()
 
 
-def view():
+def read_master_passwords():
     """
-    View the existing passwords stored in the passwords file.
+    Read the master passwords from the password file.
     """
-    master_pwd = input("Enter the master password to view passwords: ")
-    if validate_master_password(master_pwd):
+    password_dict = {}
+    if os.path.exists(PASSWORDS_FILE):
         with open(PASSWORDS_FILE, "r") as f:
-            for line in f.readlines():
-                data = line.rstrip()
-                user, passwd = data.split("|")
-                decrypted_passwd = fer.decrypt(passwd.encode()).decode()
-                print(f"User: {user}, Password: {decrypted_passwd}")
-    else:
-        print("Invalid master password. Access denied.")
+            for line in f:
+                values = line.strip().split("|")
+                if len(values) == 2:
+                    user, master_pwd = values
+                    password_dict[user] = master_pwd
+    return password_dict
+
+
+def write_key(user, master_password, key, salt):
+    """
+    Write the encryption key to a file and update the master password dictionary.
+    """
+    key_file = os.path.join(KEYS_DIRECTORY, f"{user}.key")
+    with open(key_file, "wb") as f:
+        f.write(key)
+
+    global master_passwords
+    master_passwords[user] = master_password
+
+    with open(PASSWORDS_FILE, "a") as f:
+        f.write(f"{user}|{master_password}|{base64.urlsafe_b64encode(salt).decode()}\n")
 
 
 def add():
@@ -54,25 +97,62 @@ def add():
     """
     name = input("Account Name: ")
     pwd = input("Password: ")
+    user = input("Enter your username: ")
+
+    master_pwd = input("Enter your master password: ")
+    salt = os.urandom(KEY_LENGTH)
+    key = generate_key(master_pwd, salt)
+    write_key(user, master_pwd, key, salt)
+
+    cipher_suite = Fernet(key)
+    encrypted_pwd = cipher_suite.encrypt(pwd.encode()).decode()
 
     with open(PASSWORDS_FILE, "a") as f:
-        encrypted_pwd = fer.encrypt(pwd.encode()).decode()
-        f.write(f"{name}|{encrypted_pwd}\n")
+        f.write(f"{user}|{name}|{encrypted_pwd}|{base64.urlsafe_b64encode(salt).decode()}\n")
 
 
-def validate_master_password(pwd):
+def view():
     """
-    Validate the master password provided.
+    View the existing passwords stored in the passwords file.
     """
-    return pwd == master_pwd
+    user = input("Enter your username: ")
+
+    if user not in master_passwords:
+        print("Invalid username. Access denied.")
+        return
+
+    master_pwd = input("Enter the master password to view passwords: ")
+
+    if master_passwords[user] != master_pwd:
+        print("Invalid master password. Access denied.")
+        return
+
+    key_file = os.path.join(KEYS_DIRECTORY, f"{user}.key")
+    if not os.path.exists(key_file):
+        print("No passwords found.")
+        return
+
+    with open(key_file, "rb") as f:
+        key = f.read()
+
+    with open(PASSWORDS_FILE, "r") as f:
+        for line in f.readlines():
+            data = line.rstrip()
+            values = data.split("|")
+            if len(values) == 4 and values[0] == user:
+                cipher_suite = Fernet(key)
+                try:
+                    decrypted_passwd = cipher_suite.decrypt(values[2].encode()).decode()
+                    print(f"User: {values[0]}, Account: {values[1]}, Password: {decrypted_passwd}")
+                except InvalidToken:
+                    print("Invalid master password. Access denied.")
+                    return
 
 
-master_pwd = input("What is the master password? ")
-key = load_key()
-fer = Fernet(key)
+initialize()
 
 while True:
-    mode = input("Would you like to add a new password or view existing ones (view, add), press q to quit: ").lower()
+    mode = input("Press Add or View (to add or view passwords), press q to quit ").lower()
     if mode == "q":
         break
     elif mode == "view":
@@ -82,4 +162,3 @@ while True:
     else:
         print("Invalid input")
         continue
-
