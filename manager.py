@@ -122,15 +122,25 @@ def view():
                     return
 
 
-if os.path.exists(PASSWORDS_FILE):
-    with open(PASSWORDS_FILE, "r") as f:
-        for line in f:
-            user, master_pwd, _ = line.strip().split("|")
-            if user in master_passwords:
-                master_passwords[user].append(master_pwd)
-            else:
-                master_passwords[user] = [master_pwd]
+def read_passwords_file():
+    """
+    Read the passwords file and populate the master_passwords dictionary.
+    """
+    global master_passwords
+    if os.path.exists(PASSWORDS_FILE):
+        with open(PASSWORDS_FILE, "r") as f:
+            for line in f.readlines():
+                values = line.strip().split("|")
+                if len(values) == 3:
+                    user, master_pwd, salt = values
+                    salt = base64.urlsafe_b64decode(salt.encode())
+                    if user in master_passwords:
+                        master_passwords[user].append(master_pwd)
+                    else:
+                        master_passwords[user] = [master_pwd]
 
+
+read_passwords_file()
 
 while True:
     mode = input("Press Add or View (to add or view passwords), press q to quit: ").lower()
