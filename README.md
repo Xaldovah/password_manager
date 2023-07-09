@@ -7,9 +7,9 @@ This repository contains a password manager that allows you to securely _encrypt
 - Safe Key Generation: The password manager utilizes the Fernet symmetric encryption algorithm to generate strong encryption keys.
 - User-Friendly Interface: The program provides a simple command-line interface that allows you to add new passwords and view existing ones easily.
 ## Installation
-Clone the repository to your local machine using the following command:
+- Clone the repository to your local machine using the following command:
 ```git clone https://github.com/your-username/password-manager.git```
-Install the required dependencies. You can use pip to install them:
+- Install the required dependencies. You can use pip to install them:
 ```pip install -r requirements.txt```
 
 ## Usage
@@ -27,7 +27,7 @@ __Choose one__ of the following options:
 ## Security Considerations
 - __Master Password:__ The security of the password manager relies on the secrecy and strength of the master password. Choose a strong and unique master password and keep it confidential.
 - __Key File:__ The key used for encryption and decryption is stored in the *key.key* file. Ensure that this file is kept secure and not accessible to unauthorized individuals.
-__Encryption Strength:__ The password manager uses the Fernet symmetric encryption algorithm, which is considered secure. However, it is important to keep the encryption library and dependencies up to date to benefit from any security patches or improvements.
+- __Encryption Strength:__ The password manager uses the Fernet symmetric encryption algorithm, which is considered secure. However, it is important to keep the encryption library and dependencies up to date to benefit from any security patches or improvements.
 
 ## Contributing
 Contributions to this password manager project are welcome! If you find any issues, have suggestions for improvements, or would like to add new features, please open an issue or submit a pull request.
@@ -36,4 +36,4 @@ Contributions to this password manager project are welcome! If you find any issu
 This project is licensed under the [The MIT License](https://opensource.org/license/mit/). Feel free to use, modify, and distribute this code for personal or commercial purposes.
 
 ## Acknowledgements
-This project utilizes the cryptography[cryptography](https://cryptography.io/) library for encryption and decryption functionality.
+This project utilizes the [cryptography](https://cryptography.io/) library for encryption and decryption functionality.
